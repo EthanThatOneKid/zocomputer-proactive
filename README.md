@@ -44,6 +44,14 @@ RRULE:FREQ=WEEKLY;BYDAY=SU;BYHOUR=10;BYMINUTE=0
 
 It carries the same hard boundaries as the rule — no pushing, rebasing, force-updating, deleting checkouts, or manifest edits, and it never runs a blanket `wspace update`, which would fast-forward every clean checkout in one pass.
 
+### Worked example: a dead link inherited into new work
+
+Writing a new blog post turned up a link the site had used for two years: `go.fart.tools/chat` answered `404 DEPLOYMENT_NOT_FOUND`, because Deno Deploy Classic was sunset on 2026-07-20 and the shortlink service behind it never moved. Twenty-plus posts and four navbar buttons point at that host.
+
+The safe half was local and immediate: the new draft does not carry the dead link, so a fresh page never adds a twenty-first reference to a broken host. The unsafe half stayed named rather than performed — rewriting twenty existing posts is a content decision, and redeploying the shortlink service or replacing it with a real invite URL is a deployment. Both went out in one line, next to the separate finding that `fartlabs.org` serves a certificate whose SANs cover only the host's cluster name, so HTTPS fails verification even though the page itself answers.
+
+The lesson: finding something broken while producing new content is a repair *in* that content, not a licence to rewrite everything that mentions it.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
