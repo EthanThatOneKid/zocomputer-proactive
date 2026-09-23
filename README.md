@@ -52,6 +52,16 @@ The safe half was local and immediate: the new draft does not carry the dead lin
 
 The lesson: finding something broken while producing new content is a repair *in* that content, not a licence to rewrite everything that mentions it.
 
+### Worked example: the certificate was a DNS shadow, and the fix was one toggle
+
+A previous session escalated `fartlabs.org` for serving a certificate whose SANs covered only its cluster name, so HTTPS failed verification while the page itself answered. A dedicated automation had been retrying the certificate since; a retry in this session failed with the same message Deno had printed days earlier — `Incorrect TXT record "..." (and 1 more) found at _acme-challenge.fartlabs.org`, with zero certificates issued.
+
+One query explained it. Cloudflare publishes a `CNAME` at `_acme-challenge.fartlabs.org` pointing at the value Deno asks for, so the ACME attempt itself is legitimate. But the same zone also serves two `TXT` records at that name — Cloudflare's own DCV values, owned by the dashboard with no UI to delete them. A `CNAME` cannot coexist with `TXT` at one name, so resolvers answered with both, and Deno rejected the set exactly as its message said.
+
+The proxy toggle was already the answer. Cloudflare had issued an edge certificate covering `fartlabs.org` and `*.fartlabs.org`, and the zone's SSL mode was already Full, which validates the origin. Only the apex record was DNS-only, so nothing ever used that certificate. Proxying the apex record moved TLS termination to Cloudflare's edge certificate: `https://fartlabs.org` then returned 200 with `ssl_verify_result 0`, and its body was byte-identical to the Deno production revision. Deno never has to issue for that host, so the shadowed records stop mattering.
+
+The lesson: when a certificate keeps failing and the diagnostic names a record you did not create, look for a second system in the same zone before calling it a provider bug — and check whether a switch you already own makes the broken path irrelevant. Here the provider's own certificate was never needed.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
