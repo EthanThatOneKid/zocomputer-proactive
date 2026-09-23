@@ -44,6 +44,18 @@ RRULE:FREQ=WEEKLY;BYDAY=SU;BYHOUR=10;BYMINUTE=0
 
 It carries the same hard boundaries as the rule — no pushing, rebasing, force-updating, deleting checkouts, or manifest edits, and it never runs a blanket `wspace update`, which would fast-forward every clean checkout in one pass.
 
+### Worked example: two domains stuck behind a sunset platform
+
+`fartlabs.org` served a certificate for the wrong host, and `fart.tools` / `go.fart.tools` still resolved to the retired Deno Deploy Classic address, so every host on that zone answered `404 DEPLOYMENT_NOT_FOUND`. The repairs were all read-only inspection first, then the smallest reversible writes:
+
+- The apex cert failure was not a cert problem. `_acme-challenge.fartlabs.org` carried Cloudflare's own Universal SSL DCV record for that zone, and the edge serves that name ahead of any CNAME, so Let's Encrypt's DNS-01 never saw Deno's token. The fix was to stop fighting for that name: proxy the apex so Cloudflare's edge certificate serves the hostname. Deno's domain record keeps its `failed` provisioning state and stops mattering. Read the `provisioning_status.message` before assuming a token was mistyped.
+- A custom domain has to be attached to a **revision**, not just created at the org level: `PUT /v2/revisions/{revision}/domains` with `{"production":[...]}`. Deno answers `DOMAIN_NOT_VERIFIED_ERROR` if the domain record is unvalidated, so validate first (`POST /v2/domains/{domain}/verify`) — and validation can succeed from public DNS before the zone's delegation has propagated.
+- The nameservers were the real gate. The Cloudflare zone sat `pending` while the registry still delegated to the registrar's servers; nothing on the DNS side needed changing and no zone re-add was required, because Cloudflare's activation check passes on its own once the registry republishes.
+
+What the pass also caught by looking one layer past the reported symptom: the site's stylesheet link points at `css.fart.tools`, whose Deno app was healthy but had no hostname binding, so the page loaded with no CSS. Reading the response body of the failing asset (`404 DEPLOYMENT_NOT_FOUND`) distinguished "app is gone" from "nothing is routed here", and one `PUT` restored it.
+
+The two hosts that still point at the sunset address were left alone and named in one line: they have no app to bind to, so repointing or removing them is a decision, not a repair.
+
 ### Worked example: a dead link inherited into new work
 
 Writing a new blog post turned up a link the site had used for two years: `go.fart.tools/chat` answered `404 DEPLOYMENT_NOT_FOUND`, because Deno Deploy Classic was sunset on 2026-07-20 and the shortlink service behind it never moved. Twenty-plus posts and four navbar buttons point at that host.
