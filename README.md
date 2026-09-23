@@ -87,6 +87,32 @@ The proxy toggle was already the answer. Cloudflare had issued an edge certifica
 
 The lesson: when a certificate keeps failing and the diagnostic names a record you did not create, look for a second system in the same zone before calling it a provider bug — and check whether a switch you already own makes the broken path irrelevant. Here the provider's own certificate was never needed.
 
+### Worked example: the committed table was a pure function of its own evidence
+
+`EthanThatOneKid/linkedin-memory` committed a 2,020-row `connections.csv` beside the
+append-only evidence it was derived from: the connections-page DOM captures and the
+official archive's `Connections.csv`. Asked whether the table was redundant, the answer
+was proved rather than asserted — a builder that reads `raw/` alone was written, run, and
+diffed against the committed file. It reproduced every row, and the diff exposed three
+defects the committed copy had been hiding:
+
+- The archive CSV carries a `U+2028` LINE SEPARATOR inside one company field, and
+  `str.splitlines()` splits on it. `David Lee` lost his company, position, and connection
+  date, and the fragment after the separator became a phantom 2,020th person whose profile
+  URL was the string `14 Jul 2025`. Splitting on `\n` fixed both halves.
+- `last_seen` recorded the run date rather than the capture that last observed the row, so
+  405 pages claimed to have been seen on 09-23 when the newest capture holding them was
+  09-22.
+- Rendering never pruned, so the phantom person had a committed wiki page that outlived the
+  row it came from.
+
+The repair was to delete the duplicate and keep the provenance: `tools/corpus.py` builds the
+corpus from `raw/` into a gitignored `build/`, the renderer prunes pages whose row is gone,
+and a test asserts that building twice is identical and pins the archive's quirks. The
+lesson is that a derived artifact is only as trustworthy as its last writer. Proving "this
+is a pure function of X" is cheap — build it and diff — and a committed copy carries no
+information the evidence does not, so it can only drift from it.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
