@@ -56,6 +56,19 @@ What the pass also caught by looking one layer past the reported symptom: the si
 
 The two hosts that still point at the sunset address were left alone and named in one line: they have no app to bind to, so repointing or removing them is a decision, not a repair.
 
+### Worked example: reviving the hosts the sunset left behind
+
+Same zone, second pass, this time with approval to deploy. Four hostnames were dead or misrouted, and each one turned out to be blocked by something other than what it looked like.
+
+- `go.fart.tools` had an app whose only build had failed. The failure was not in the code being shipped but in the contract it shipped under: the entrypoint only called `Deno.serve` behind `import.meta.main` and exported nothing, and the app's stored runtime args were Classic-era CLI flags (`-A --env --unstable-kv`). Deploy v2 wants an exported `{ fetch }` handler and has no use for Deno CLI flags in `args`. Export the handler, drop the args, keep the `import.meta.main` branch for local runs.
+- The same app "had no KV database configured", and the platform would not supply one: `POST /v2/database_instances` answered `DATABASE_INSTANCE_LIMIT_EXCEEDED`, the plan's single Deno KV instance already belonging to another project. Renaming it onto a live project's instance is not a repair, so the app was made to run without KV — `openKv()` inside a try/catch, a committed JSON ruleset as the read-only base, `503` on writes — which turned a boot failure into a working service with a named, one-line follow-up.
+- The dead link that started it all needed data, not infrastructure: the service resolves shortlinks from that committed ruleset, so the invite URL the user supplied went in as `chat`, and `go.fart.tools/chat` now redirects where the site's own button and twenty-odd blog posts expect.
+- `fart.fart.tools` still 500ed on every request after its app built, and the cause was again the sunset rather than the request path: a middleware destructured a tuple from the retired Classic deployments API, so it threw before any route ran. Fail-safe it (try/catch, warn once, skip the redirect) and the server serves; reimplementing the feature on `v2` is a separate, honest follow-up. The same file carried a literal `ddp_…` access token; the fallback is gone, so the feature now needs env config or does nothing.
+- Both new apps were deployed from a branch rather than `main` (`custom.git.ref` labels make that provenance visible), because the fixes are still open pull requests. A deploy from a branch is not a merge and not a push to `main`; it just stops the outage while review happens.
+- The last gap was not a bug at all: `PUT /v2/revisions/{rev}/domains` returned `204` for two unregistered hostnames, and both still answered `404 DEPLOYMENT_NOT_FOUND`, because the org plan includes five custom domains and all five were spoken for. A `204` from that call is not proof a hostname is routed. Creating the app and deploying it were both within the approval given; taking a domain slot from `css.fart.tools` or `jsonx.fart.tools`, or changing plan tiers, is a product decision, so it was escalated in one line with the app left live on its `*.deno.net` hostname in the meantime.
+
+The reusable habits: read the failing response *body* before theorising; prefer fail-safe over fail-hard when the dependency is a retired platform; keep an optional dependency optional when the platform, not the code, is the constraint; treat any `2xx` that does not change observable behaviour as unverified; and name the single decision that remains instead of absorbing it.
+
 ### Worked example: a dead link inherited into new work
 
 Writing a new blog post turned up a link the site had used for two years: `go.fart.tools/chat` answered `404 DEPLOYMENT_NOT_FOUND`, because Deno Deploy Classic was sunset on 2026-07-20 and the shortlink service behind it never moved. Twenty-plus posts and four navbar buttons point at that host.
