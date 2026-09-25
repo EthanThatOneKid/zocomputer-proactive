@@ -272,3 +272,20 @@ The same docs listed six GitHub Actions secrets; four have not been read by the 
 The trust half was a documented `health-qa` CI job verifying production after deploy. The only workflow contains no such job, and production deploys are dispatch-only, so the live Worker was read from the Cloudflare API (read-only) rather than inferred: it dates to three days before the newest merged fixes, which is the fact the person actually needed. When a doc states an HTTP status, curl it; when it names a CI job, grep the workflow.
 
 The pass also pruned four local branches whose work had already landed through a squashed merge -- `git cherry` separates a superseded patch from one that never landed -- and left a shared remote asset branch alone, since deleting a remote branch is a decision, not a repair.
+
+## Worked example: the prompt that named its own answer
+
+A reading of `pioneer-api`'s source turned up a literal inside the vision prompt: *"The image contains six orange numbered bubbles, gray leader lines, and six black geometry features."* The count, the palette, and the word **fixture** were all in the instruction the model received, so a detector presented as general was describing one specific test image back to itself. It would still have returned six bubbles on a drawing with nine, and the one-to-one gate downstream would have failed with a count error that looked like a model problem rather than a prompt defect.
+
+The safe set, fixed in the session it was found:
+
+- the prompt became a versioned, drawing-agnostic template (`iwp-bubble-detector/2`) — no count, no colour, no fixture layout, an explicit instruction not to invent a bubble to reach a total, and the digits-only contract the validator already enforced;
+- the expected count became an optional caller hint, threaded through the service and the review page, recorded in the prompt but never treated as a target;
+- the response summary and the detector output now carry `promptVersion`, which the statement of work already required of the audit record and nothing was producing;
+- the fixed `maxOutputTokens` of 2,048 became the named `MAX_DETECTOR_OUTPUT_TOKENS` (8,192) once the verification run showed it no longer fitted;
+- the count-mismatch error now says which way the counts diverged, because "6 features, 7 bubbles" is the shape a real drawing will hit;
+- the README's local-demo line told you to run the service with `PIONEER_GEMINI_API_KEY` in the environment, but the service has no server-side key fallback by design — it is strictly BYOK through a request header. The doc was corrected to match the boundary rather than the boundary loosened to match the doc.
+
+**Running the verification is what found the second defect.** Re-running the live Gemini evaluation on the same fixture with the new prompt returned the same six labels, the same `A17`–`A22` → `705`, `102`, `991`, `314`, `808`, `127` mapping, six rewrites with the UTF-16LE envelope preserved, and a maximum leader-endpoint error of 2.00 px. The run also spent 1,998 output tokens — 1,302 of them reasoning — against a 2,048-token ceiling, and a second run spent 2,314. The old budget was one bubble away from truncating the response, which no amount of re-reading the prompt would have revealed.
+
+What was deliberately left alone: the matcher's ambiguity check re-solves the whole assignment once per row on top of an O(n³) solve, so it is O(n⁴) and the 32-observation cap is load-bearing rather than arbitrary. Making that production-shaped for drawings with hundreds of bubbles is a design change, not a repair, so it is recorded as an open limitation in the proof report instead of being quietly tightened. The commit stayed local; the push is the escalation.
