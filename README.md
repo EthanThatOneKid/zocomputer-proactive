@@ -206,17 +206,37 @@ healthy; one duplicated secret had simply gone stale. The lesson is that "the de
 failed" and "the platform is broken" are different claims, and a second consumer of the
 same dependency is the cheapest way to tell them apart.
 
-**A production deploy that would have been a data migration.** The same work had a
-production step queued: merge a dependency bump and deploy it, applying a D1 `world_uid` →
-`world_id` rename in production. What stopped it was reading the ticket that governs the
-transition and the PR that would perform it. The route map said hot storage columns keep
-`world_uid` internally, and the storage-boundary ticket existed precisely to decide that
-question — while the PR itself noted a dependency on a vector-metadata cut owned by another
-repo. The change was coherent and tested; its authorization was not in evidence, and
-running it would have made an open decision moot by executing it. Merging to `main` had
-already been approved, so the gate was surfaced as one line naming the repo, the action,
-and the reason, and the call was left to Ethan. "Tests pass" is a claim about the code, not
-about whether the change is the right one to run in production today.
+**A production deploy the agent misread as a decision, and the decision it actually faced.**
+The same work had a production step queued: merge a dependency bump and deploy it, applying
+a D1 `world_uid` → `world_id` rename in production. It was held back, and the hold was read off
+the **issue bodies**: the route map's "out of scope" line said hot storage columns keep
+`world_uid` internally, and the storage-boundary ticket's body framed the rename as an open
+question. Both readings were wrong. The answers were in the **comments** — the boundary
+ticket carried a resolution comment, *"`world_id` everywhere — including storage"*, whose
+table named the data-plane D1 layer explicitly, and the map's decision record listed the
+storage rename as the first execution step. The merged upstream change was even titled
+*canonical `world_id` storage*. Ethan had to ask "why are we still holding?" before the
+comments were read.
+
+Two habits fall out, and they are different from the ones the earlier examples teach. First:
+a tracker body is a snapshot from the day the ticket was filed; on any ticket with comments,
+the **latest** comment is the state, and `gh issue view —json comments` is one call. Second:
+an earlier example in this same file ("verify a PR's claims before promoting it") argued for
+holding when a merged change's claims conflict with an open ticket. That advice was not
+wrong so much as under-specified — it never said which artifact to read. Conflict should
+resolve toward the newest dated resolution, not the artifact that is easiest to quote.
+
+The second half of the episode is the one worth keeping. After the promote was approved,
+production deployed the new code and its `worlds-cloudflare` schema stayed at v1: the SDK's
+`ensureSchema()` gates the rename behind `if (this.worldId)`, so the migration fires **lazily,
+on the first world-scoped request**, not at deploy. The deploy job reported success while the
+live database still had `world_uid` on `quads`/`chunks` and no v2 row, and QA had migrated
+only because its smoke and e2e runs happen to do world-scoped work. The fix was to stop
+waiting for traffic to do it: one read-only `SELECT` against an existing production world
+walked the platform's own migration path, after which `quads.world_id` and `chunks.world_id`
+existed, the version row read 2, the pre-existing rows were intact, and an authenticated
+health run passed 11/11. "The deploy succeeded" answers whether the code shipped, never
+whether the schema moved; both are read from the live system, not from the job's green check.
 
 **A doc that contradicted the live server.** The same repo's smoke checklist said sign-in
 was a `307` redirect. Production actually answers `200` on `/sign-in/` and puts the redirect
