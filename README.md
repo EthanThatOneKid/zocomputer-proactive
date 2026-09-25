@@ -203,3 +203,15 @@ If you fork this rule, the versioning bullet names Ethan's own checkout (`repos/
 ## Boundaries
 
 The rule is explicitly not a license to act on anything external. It grants local, reversible repair work; it withholds merges, pushes, deployments, publishing, spending, and repository or manifest changes until a human says so — the one pre-approved exception being the commit and push that keeps `rule.md` and this README in step with the live rule. Secret material stays out of repositories, and a problem that genuinely cannot be acted on is reported with the reason instead of quietly absorbed.
+
+### Worked example: the QA checklist pointed at the wrong route
+
+A request for a pre-QA status briefing on the Wazoo console turned up drift that would have cost the person running the checklist real time, plus one claim nothing backed.
+
+The release docs, in two places, said to smoke-test sign-in by curling `https://console.wazoo.dev/sign-in/` and confirming a `307`. That route answers `200` -- it is the sign-in page. The `307` to WorkOS authorize lives on `/` and the protected routes, and `/sign-in` first `308`s to `/sign-in/` on the trailing slash. Both files were corrected in-session so the checklist names the route that actually redirects.
+
+The same docs listed six GitHub Actions secrets; four have not been read by the deploy jobs since secrets moved to Infisical over OIDC. `gh secret list` and `gh variable list` settle it in one call -- only the two Cloudflare secrets and the two Infisical variables exist.
+
+The trust half was a documented `health-qa` CI job verifying production after deploy. The only workflow contains no such job, and production deploys are dispatch-only, so the live Worker was read from the Cloudflare API (read-only) rather than inferred: it dates to three days before the newest merged fixes, which is the fact the person actually needed. When a doc states an HTTP status, curl it; when it names a CI job, grep the workflow.
+
+The pass also pruned four local branches whose work had already landed through a squashed merge -- `git cherry` separates a superseded patch from one that never landed -- and left a shared remote asset branch alone, since deleting a remote branch is a decision, not a repair.
