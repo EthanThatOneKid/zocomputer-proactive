@@ -338,3 +338,21 @@ The safe set, fixed in the session it was found:
 **Running the verification is what found the second defect.** Re-running the live Gemini evaluation on the same fixture with the new prompt returned the same six labels, the same `A17`–`A22` → `705`, `102`, `991`, `314`, `808`, `127` mapping, six rewrites with the UTF-16LE envelope preserved, and a maximum leader-endpoint error of 2.00 px. The run also spent 1,998 output tokens — 1,302 of them reasoning — against a 2,048-token ceiling, and a second run spent 2,314. The old budget was one bubble away from truncating the response, which no amount of re-reading the prompt would have revealed.
 
 What was deliberately left alone: the matcher's ambiguity check re-solves the whole assignment once per row on top of an O(n³) solve, so it is O(n⁴) and the 32-observation cap is load-bearing rather than arbitrary. Making that production-shaped for drawings with hundreds of bubbles is a design change, not a repair, so it is recorded as an open limitation in the proof report instead of being quietly tightened. The commit stayed local; the push is the escalation.
+
+## Worked example: the branch that called itself "retire the file" and reverted the week
+
+A cleanup pass found three `.af` Agent File artifacts still on disk and a stale draft PR (#87, `factory/feature-investigate-af-projection`) that claimed to retire them. The obvious move — rebase the draft and merge it — would have been the worst possible outcome. Diffing the branch's tip against `main` showed it was not a retirement at all:
+
+- Every doc it touched came back line-numbered (`1: # Computer architecture`, `2:`, `3:`), a corruption pattern rather than an edit. `README.md`, `AGENTS.md`, and `.github/ARCHITECTURE.md` were all rewritten that way.
+- It *deleted* `lib/host-secrets.ts`, `lib/discord-guild-wide.test.ts`, and the guild-wide branch of `lib/discord-policy.ts` — the exact work merged from PRs #88–#91 days earlier. Merging the "cleanup" would have re-introduced the crash it was written to prevent.
+- It also carried a whole new `application/` Python tree (`agent_file_processor.py`, `src/af_projection.py`) for files the repo had never had, because the factory's analyst had hallucinated a Python project inside a TypeScript/eve repo.
+
+The branch was closed unmerged with the findings recorded, its remote deleted, and the retirement redone by hand as PR #93: the generated `computer.af`, its declaration, the four `lib/agent-file-*.ts` modules, the exporter script, two package scripts, and the CI drift step all deleted, with `AGENTS.md`, `README.md`, `.github/ARCHITECTURE.md` and `.github/workflows/verify.yml` trimmed to match. `pnpm typecheck`, 174 tests, and `pnpm build:eve` passed, and the CI step that used to regenerate the `.af` was removed rather than left to fail.
+
+The habits worth keeping:
+
+- **A draft PR is a claim, not a finding.** "Retire X" on the branch name said nothing about what the branch did; `git diff origin/main origin/<branch> --stat` said everything. Read the diff before rebasing anything authored by another agent.
+- **Line-numbered docs are a corruption signature**, not a formatting choice. When every line of a markdown file gains a `N:` prefix, the writing tool serialised its own output instead of a file.
+- **A file the branch adds back is as suspicious as one it deletes.** A "deletion" branch that *adds* a Python application to a TypeScript repo is describing a different repository than the one it is opened against.
+- **Retiring an artifact with a published consumer means checking where the archive lives.** The `.af` was already preserved in `wazootech/data` at `archives/agent-file/data.af` with its own retirement README, so deleting it from `computer` lost nothing — and the README in `computer` now points at that archive.
+- **The safe cleanup here was the *opposite* of the tempting one.** The tempting action (rebase + merge) was destructive; the safe action (close the branch, redo the deletion by hand, verify) was more work and the only correct one.
