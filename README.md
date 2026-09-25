@@ -162,6 +162,34 @@ later. The same pass trashed 102 host-workspace tool droppings (`gmail-*.eml/htm
 export quartets, scratch JSON, a stray `--full-page` screenshot) because the canonical
 copies live in Gmail and in the connector's `raw/` tree — local, reversible, and reported.
 
+### Worked example: verifying a prune you did not watch happen
+
+Cleaning up after a prune is harder than doing the prune, because a squash-merge workflow
+leaves no local trace of what a deleted branch pointed at. In one session 27 worktrees and
+21 branches disappeared from `worktrees/` between two consecutive checks, with no command
+of mine in between — the same cleanup had already run in a parallel session on the same
+host. The status of the work itself was still answerable, and every deleted branch tip had
+to pass one of three tests before the deletion could be called safe:
+
+- **Ancestor of `origin/main`.** The cheap case, and the only one `git branch --merged` can
+  see.
+- **A pull-request head on the forge.** `git ls-remote origin 'refs/pull/*/head'` printed
+  every tip of the deleted set, so nothing was lost even though the branch refs were gone —
+  the commits existed only as unreachable objects locally. `git fsck --unreachable` plus a
+  `git log -1 --format=%s` per commit is what confirms a tip is on no ref, and the PR list
+  (`gh pr list --state all` → `MERGED`) is what confirms the content landed.
+- **An explicit recovery ref.** Two `super-fly` commits existed in no other place: they were
+  local-only follow-ups on branches whose pull requests had been squash-merged, so the tip
+  was neither an ancestor of `main` nor present as a PR head. Same for a `wiki` branch tip.
+  All three were pinned with `git update-ref refs/recovery/<name>-tip <sha>` — one commit
+  each, seconds to create, and the difference between "pruned" and "lost" for them.
+
+The lesson is to treat "the branch is merged, so deleting it is safe" as a claim to verify
+three ways rather than to assume, and to leave the recovery refs behind rather than trusting
+a reflog that a `git gc` can expire. Temporary refs created while investigating (fetching
+PR heads came with 342 `refs/remotes/prcheck/*` entries) should be deleted in the same pass,
+because they freeze every object they reach against garbage collection.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
