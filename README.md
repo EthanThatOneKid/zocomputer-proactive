@@ -190,6 +190,54 @@ a reflog that a `git gc` can expire. Temporary refs created while investigating 
 PR heads came with 342 `refs/remotes/prcheck/*` entries) should be deleted in the same pass,
 because they freeze every object they reach against garbage collection.
 
+### Worked example: a silent gate, a stale secret, and a production deploy that would have renamed live data
+
+A question about "any updates before I do manual QA" turned into three findings that all
+lived one layer below the thing being asked about.
+
+**The gate that failed only when something merged.** `worlds-api` runs a `health-qa` job
+with an admin key. It was green on 2026-09-02 and failed on the first run since — which was
+also the first run since the Infisical secrets cutover. Reading the log showed all four
+failures were `401`/`403` while every unauthenticated check passed, so the API was up and
+the credential was not. The decisive test was a sibling workflow in a different repo:
+`wazoo-api`'s daily `smoke-qa` hits the same QA data plane with the same class of key, and
+it had passed that morning and passed again when dispatched against the migration. QA was
+healthy; one duplicated secret had simply gone stale. The lesson is that "the deploy
+failed" and "the platform is broken" are different claims, and a second consumer of the
+same dependency is the cheapest way to tell them apart.
+
+**A production deploy that would have been a data migration.** The same work had a
+production step queued: merge a dependency bump and deploy it, applying a D1 `world_uid` →
+`world_id` rename in production. What stopped it was reading the ticket that governs the
+transition and the PR that would perform it. The route map said hot storage columns keep
+`world_uid` internally, and the storage-boundary ticket existed precisely to decide that
+question — while the PR itself noted a dependency on a vector-metadata cut owned by another
+repo. The change was coherent and tested; its authorization was not in evidence, and
+running it would have made an open decision moot by executing it. Merging to `main` had
+already been approved, so the gate was surfaced as one line naming the repo, the action,
+and the reason, and the call was left to Ethan. "Tests pass" is a claim about the code, not
+about whether the change is the right one to run in production today.
+
+**A doc that contradicted the live server.** The same repo's smoke checklist said sign-in
+was a `307` redirect. Production actually answers `200` on `/sign-in/` and puts the redirect
+on the protected routes. The fix was already committed and unpushed, which is why the
+correction was published rather than rewritten. Verifying the claim against the live
+endpoint — three `curl`s — is what turned a plausible checklist item into a false one.
+
+Two smaller things ran through the same pass: a worktree created with a relative path landed
+at `repos/worlds-api/worktrees/...` instead of the canonical `worktrees/` tree, so it was
+moved in the same session rather than left to confuse the next one; and a scheduled backup
+automation still described four agents when the fleet had five, drift the rule's own loop
+requires fixing on sight.
+
+**The recurring half.** The stale-secret class of failure is invisible until a merge happens
+to run the gate, so it became a weekly canary rather than a lesson: inspect the three
+credential-exercising gates, compare each repo's GitHub secrets against the Infisical
+cutover date to flag anything still consumed but older than the cutover, probe the six
+public health endpoints, and report by email. It observes and reports only — it never
+rotates a secret or edits a workflow, because a rotation is a decision and the canary's job
+is to make the decision arrive on time.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
