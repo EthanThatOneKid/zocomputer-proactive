@@ -113,6 +113,55 @@ lesson is that a derived artifact is only as trustworthy as its last writer. Pro
 is a pure function of X" is cheap — build it and diff — and a committed copy carries no
 information the evidence does not, so it can only drift from it.
 
+### Worked example: the worktrees a repository move left behind
+
+A workspace check came back all-clean while `worktrees/` still held ~866 MB of dead
+checkouts. Nothing flagged them, because `wspace check` reports registered manifest
+repositories, not the directories people park worktrees in.
+
+The stale set had three shapes, and each needed a different test before anything was
+deleted:
+
+- **Registrations whose directory is gone.** `git worktree list` in `wiki` still named a
+  worktree under `repos/wazootech-workspace/…`, a path that stopped existing when the
+  checkouts moved to `workspaces/wazootech/repos/…`. Its branch had a merged pull request.
+  `git worktree prune` clears the registration; the directory was already gone.
+- **Directories registered as worktrees from a gitdir that no longer resolves.** The
+  `wiki` and `workspace-cli` leftovers carried a `.git` *file* pointing into the retired
+  `repos/wazootech-workspace/` tree, so git called them "not a repository" outright. Their
+  branches were merged too, which is what made deleting the directories safe.
+- **Plain copies that were never worktrees at all.** `worktrees/computer/durable-intake`
+  (682 MB, 43k files) and `worktrees/computer/agent` had no `.git` of their own, so git
+  silently resolved them to the *surrounding* workspace repository's `.git` and reported a
+  clean `main` — a false clean. The decisive check was content, not git state:
+  `git hash-object` on every file against `git rev-parse <merge-commit>:<path>`. Every
+  source file matched the merged commit `81bec22` of PR #49 (only `tsconfig.tsbuildinfo`
+  was extra), so the copy held nothing that had not landed, and `gh pr list --state all`
+  confirmed the merge.
+
+The general lesson is that squash merges make `git branch --merged` useless as the safety
+test — the branch tip is never an ancestor of `main` — so the answer has to come from the
+forge (`gh pr list … --state all` shows `MERGED`) plus a content comparison for any
+directory whose git state cannot be trusted. `git worktree list --porcelain` marks the
+prunable case explicitly, which is cheaper than guessing.
+
+### Worked example: the 1.6 MB that cannot be deleted
+
+The same pass removed 682 MB of dead checkout and could not finish the last 1.6 MB.
+Every `node_modules` entry pnpm had left behind gave `EPERM` on unlink *and* on rename,
+while a symlink created in that same directory moments later deleted normally. The
+difference is the link count: the leftovers report `nlink=2` and the fresh one does not,
+which is the sandbox's copy-on-write layer refusing to drop a shared entry. `chattr -i` is
+no help (the filesystem reports no such attribute), and `mv` on the same mount falls back
+to copy-and-delete, so "move it out of the way" quietly produced a second copy instead of
+relocating the first.
+
+The honest outcome is a documented remnant: the directory's real contents are gone, the
+dangling symlinks stay, and the limitation is written down instead of being rediscovered
+later. The same pass trashed 102 host-workspace tool droppings (`gmail-*.eml/html/md/txt`
+export quartets, scratch JSON, a stray `--full-page` screenshot) because the canonical
+copies live in Gmail and in the connector's `raw/` tree — local, reversible, and reported.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
