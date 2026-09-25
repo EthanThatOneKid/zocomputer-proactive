@@ -247,6 +247,33 @@ is to make the decision arrive on time.
 
 The lesson: verify a PR's claims against the live system and the governance ticket before promoting it, and treat a skipped deploy job as "not yet validated in production" rather than "will be fine". Refreshing a lockfile to match its manifest is a safe local fix; the production promotion is the escalation.
 
+### Worked example: a quoted status report is a claim, not a finding
+
+A status report pasted in from an earlier session asserted two faults and asked for one to be
+fixed. Both had to be re-derived from live state, and both came out different.
+
+It said Goop's service *"loads `/root/.zo_secrets` and exports the whole file, so keys in it
+without a single leading space break the `KEY=value` parsing and can drop secrets"*, with a fix
+"written but not merged". Live checks said otherwise: every line in `/root/.zo_secrets` is
+`export KEY=value` with no indentation, both loaders require the `export ` prefix and trim, and
+the next Goop start loaded 39 vars, up from 34, including the two added that day. There was no
+secret-parsing fault and no pending fix for one. The service was `FATAL` all the same —
+`Cannot find package 'zocomputer'`, a deploy that fast-forwarded the checkout without installing
+dependencies. The fix for that was an existing open PR (`FartLabs/goop` #7); merging it put the
+install between the fast-forward and the restart, and the bridge logged `ready: Goop#5456`
+twenty seconds later.
+
+The same report said to treat Computer as unverified. Computer turned out to be two things: a
+Vercel app answering `https://wazoocomputer.vercel.app` from production at `main`'s tip, and a
+thin `computer-discord-bridge` service on the host, up twenty hours. What neither the report nor
+the host tooling surfaced was a real bug underneath — the bridge holding two gateway sessions and
+reconnecting on a 60-second cycle — found by reading its own event log, not by trusting a
+summary, and filed with its root cause.
+
+The habit: re-derive every claimed fault from live state — service status, logs, the forge, the
+CLI's own output — before acting on it. A summary is a lead, not evidence. A fix for a fault that
+does not exist spends the session; the fault that is real may be the one nobody wrote down.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
