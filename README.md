@@ -238,6 +238,8 @@ existed, the version row read 2, the pre-existing rows were intact, and an authe
 health run passed 11/11. "The deploy succeeded" answers whether the code shipped, never
 whether the schema moved; both are read from the live system, not from the job's green check.
 
+**The defect that surfaced while verifying the deploy.** Reading the release path to confirm the migration turned up a second gap: `reindex` answered `{ ok: true, status: "completed" }` without ever calling the SDK, and nothing cleared the module-scope SDK cache, so a world's stale instance would keep serving after a rebuild. It was filed as `wazootech/worlds-api` issue #79 rather than left in the session, and linked from the console's stale-token issue #85 so the two silent-failure classes sit together. An anomaly found while verifying something else is still a finding.
+
 **A doc that contradicted the live server.** The same repo's smoke checklist said sign-in
 was a `307` redirect. Production actually answers `200` on `/sign-in/` and puts the redirect
 on the protected routes. The fix was already committed and unpushed, which is why the
