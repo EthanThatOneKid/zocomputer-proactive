@@ -238,6 +238,15 @@ public health endpoints, and report by email. It observes and reports only — i
 rotates a secret or edits a workflow, because a rotation is a decision and the canary's job
 is to make the decision arrive on time.
 
+## Worked example: an inherited PR branch hid a bug report
+
+`worlds-api#77` arrived as a ready-for-review PR with every expected status green — its own `verify`, and a `deploy-prod` job reporting `skipping` because production deploys are a separate manual dispatch. Two things made shipping it unwise:
+
+- A stale `package-lock.json` pinned `@worlds/cloudflare` 0.6.0 while `package.json` asked for `^0.7.0`, so CI validated a dependency the deployed artifact would not use. Refreshing the lock locally and re-running `verify` took one commit.
+- The PR body promised a D1 `world_uid` -> `world_id` column migration, but the workspace's earlier note recorded that the live production database was *already* on the new schema. The governance ticket (`wazoo-api#52`) settled it: the storage column rename is explicitly out of scope, "hot storage columns keep `world_uid` internally". The SDK's migration does emit `ALTER TABLE ... RENAME COLUMN`, but both the current and the next schema version leave the column as `world_id`, so the production path is a no-op. Had it not been, deploying would have renamed a live column for no benefit.
+
+The lesson: verify a PR's claims against the live system and the governance ticket before promoting it, and treat a skipped deploy job as "not yet validated in production" rather than "will be fine". Refreshing a lockfile to match its manifest is a safe local fix; the production promotion is the escalation.
+
 ## Keeping it current
 
 `rule.md` is not a one-time snapshot. One of its bullets makes this repository part of the rule's own loop: a change to the rule — Zo sharpening it after a session, or Ethan editing it by hand — updates `rule.md` and this README and is installed back into Zo in the same session, so the live rule and the file never drift apart.
