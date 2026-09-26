@@ -636,3 +636,41 @@ the source repo, all six report `The bundle records a complete history.`
 nonexistent ref` and checks out nothing, which again reads as a broken backup. Restore with
 `git clone -b <branch> <bundle> <dir>` — confirmed on `memory-issue-13-source-fidelity.bundle`,
 which came back as commit `17003cc` with 34 files.
+
+### Worked example: a bundle cannot hold a working tree
+
+A cutover pass found 36 worktrees under `users/etok/`. Twelve branches had commits no other
+ref held and were bundled; an eighth repo, `wazoo-api`, held the same work as *uncommitted
+edits* in eight worktrees at once. A bundle would have recorded nothing for any of them —
+`git bundle create <out>.bundle <branch>` captures commits, and these trees had none.
+
+The pass therefore saved patches instead: `git -C <wt> diff --binary > <out>.patch` for the
+tracked changes, plus a copy of every untracked file, with the identity of each confirmed by
+`sha256sum`. Twelve patches and six bundles now sit at
+`/home/workspace/backups/worktrees-2026-09-26/`. Each patch was then proven against a fresh
+clone of its branch before the directory was touched (`git clone -b <branch> <repo> <dir>` then
+`git apply --check <patch>` — both applied cleanly), because an unverified patch is a claim,
+not a backup.
+
+### Worked example: one gitdir, two directories, one missing letter
+
+`git worktree list` in `wazoo-api` named `worktrees/wazo-api/platform-id-cutover`, while the
+filesystem held that path *and* `worktrees/wazoo-api/platform-id-cutover` — a directory whose
+name dropped an `o`. Both carried a `.git` file resolving to the same
+`repos/wazoo-api/.git/worktrees/platform-id-cutover`, so both looked like real worktrees; the
+admin directory's `gitdir` file named which one was canonical. The stale one was identified by
+subset and mtime, not by name: every tracked file it changed was also changed in the other, and
+the newer directory additionally changed `tests/openapi-doc.test.ts` (mtime 19:59 vs 18:50). Its
+content was folded into the patch set before removal, so nothing rested on which directory was
+"the real one."
+
+### Worked example: the worktree that must not be pruned
+
+The same pass would have deleted `worktrees/wiki/oracle-1bfb422` — a detached worktree sitting
+on an already-merged commit, identical to `origin/main`, with no branch and no pull request.
+Grepping the tree for the directory name before acting is what stopped it: the wiki rewrite's own
+ADR says the Python oracle is "pinned at `1bfb422` and kept only in a detached local worktree
+while the cutover is validated," and open PR #317's `parity/oracle.ts` carries
+`ORACLE_PIN = "1bfb422"`. A detached worktree that matches `main` exactly is the signature of a
+deliberate pin, not a leftover — check what references the directory before removing it.
+
