@@ -458,3 +458,20 @@ Asked for an intervention on overengineering, the answer was a deletion rather t
 The safe half ran in the session: the bridge was rewritten to talk to the primitive directly, the whole runtime moved to `archives/letta-brain/` with the reasons, the docs that still described it were corrected, and the pull request carried the proof. The live cutover — merge, then retiring the now-unused service — was escalated in one line, because it is a deploy.
 
 What made this a cut and not a rewrite is that the replacement already existed and was already paid for, so nothing had to be rebuilt. Two habits carry: name the primitive that replaces the machinery *before* proposing the deletion, and archive rather than delete so the reversal stays a `git revert` away. A bespoke runtime that duplicates a primitive is a candidate for removal, not for maintenance — and its backlog usually agrees: this agent's repository held four open pull requests, every one of which the cut made obsolete.
+
+- **A mechanism claim needs a controlled test, not a correlational timestamp.**
+  Asked to explain JSR publishing, this run read `@wazoo/client`'s
+  `meta.json` (which carries a `githubRepository` link), matched the 06:44:41Z
+  publish to the 06:44:06Z merge, and concluded that JSR's GitHub integration
+  publishes on a version bump — then closed the two pull requests that added
+  push triggers as unnecessary. A controlled test settled it the other way:
+  a version bump pushed to `worlds-client-ts` main at 07:00:48 produced no
+  publish in the next 12 minutes and started no Publish workflow, while
+  creating the release published 0.2.1 within ~40 seconds. The two client
+  repos publish only on `release: published`; the rest publish on push to
+  `main`; the JSR link field is not evidence that a link is firing. Correlating
+  two timestamps inside a 40-second window cannot distinguish publishes 16
+  seconds apart from those 35 seconds apart, and a same-day run had already
+  shown a 68-minute gap between one package's release and its publish — one
+  disconfirming datapoint was sitting in the data and got smoothed over. When
+  a mechanism is cheap to test, test it before acting on the inference.
