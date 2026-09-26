@@ -450,3 +450,11 @@ moved to `archives/letta-brain/` with the reason written down.
 - **A cut is not finished at the merge.** The live service still routes through the old path
   until the branch lands, so the service removal and the now-obsolete pull requests stay
   named as open items instead of being reported as done.
+
+## Worked example: the runtime that only re-created a platform primitive
+
+Asked for an intervention on overengineering, the answer was a deletion rather than a refactor. One agent had grown a self-hosted inference runtime of its own — a local agent process, a second HTTP service, a provider key, a model configuration, a persona-seeding script, and a bespoke recover-from-a-dead-session path — to buy itself a memory. Beside it, a sibling agent doing the same job ran on a platform primitive: a persona and one bridge.
+
+The safe half ran in the session: the bridge was rewritten to talk to the primitive directly, the whole runtime moved to `archives/letta-brain/` with the reasons, the docs that still described it were corrected, and the pull request carried the proof. The live cutover — merge, then retiring the now-unused service — was escalated in one line, because it is a deploy.
+
+What made this a cut and not a rewrite is that the replacement already existed and was already paid for, so nothing had to be rebuilt. Two habits carry: name the primitive that replaces the machinery *before* proposing the deletion, and archive rather than delete so the reversal stays a `git revert` away. A bespoke runtime that duplicates a primitive is a candidate for removal, not for maintenance — and its backlog usually agrees: this agent's repository held four open pull requests, every one of which the cut made obsolete.
