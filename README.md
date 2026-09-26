@@ -356,3 +356,38 @@ The habits worth keeping:
 - **A file the branch adds back is as suspicious as one it deletes.** A "deletion" branch that *adds* a Python application to a TypeScript repo is describing a different repository than the one it is opened against.
 - **Retiring an artifact with a published consumer means checking where the archive lives.** The `.af` was already preserved in `wazootech/data` at `archives/agent-file/data.af` with its own retirement README, so deleting it from `computer` lost nothing — and the README in `computer` now points at that archive.
 - **The safe cleanup here was the *opposite* of the tempting one.** The tempting action (rebase + merge) was destructive; the safe action (close the branch, redo the deletion by hand, verify) was more work and the only correct one.
+
+## Worked example: "behind with unique work" was one true claim and one stale reading
+
+A session opened with two loose ends framed for a decision: `EthanThatOneKid/pioneer-api` main two commits ahead of its remote, and `wollacksystems.github.io` "3 behind with site-elevation work that exists only on local branches." Ethan authorized the cleanup. Re-measuring changed what both of those sentences meant.
+
+- **`wollacksystems.github.io` was not behind at all.** After `git fetch origin`, `git log HEAD..origin/main --oneline` returned nothing: local `main` and the remote were both `3e9e575`. The "behind 3" was a stale reading from an earlier `wspace check`, not the current state. A `wspace check` table is a snapshot of when it ran; re-measure before spending a decision on it.
+- **"Work that exists only on local branches" conflated two different things.** `mikes-way/site-health-audit` was already merged into `origin/main` (`git merge-base --is-ancestor` proved it), so it was pure noise. The elevation commit `3424617` was genuinely not merged — and also not wanted: it edited `index.html`, `journeyman.html`, and `style.css`, the three files the Astro migration (PR #8, then #10–#16) had already replaced with `src/pages/*.astro` and `src/styles/global.css`. Nothing lost, nothing pending.
+- **The prune-safe test is mechanical, not a vibe.** A branch is a stale duplicate when every path it touches already exists in `main` — `comm -23 <(git ls-tree -r --name-only origin/<branch> | sort) <(git ls-tree -r --name-only origin/main | sort)` prints nothing — and `main` runs ahead in content (`git diff --stat origin/main origin/<branch>` is mostly deletions). Both conditions held for the two unmerged `pioneer-api` branches (`feat/iwp-bubble-proof`, `feat/iwp-bubble-proof-core`, 2026-09-19 pre-squash tips, ~1,500 lines behind `main`). When the file list comes back empty and the diff is net-negative, prune. When a branch holds files `main` *lacks*, it is unique work and it stays.
+- **A merged remote branch is the cheap win; check merge status before touching anything.** `docs/company-context` was an ancestor of `main` and could go without a second thought. Two other remote branches needed the file-list test above. Guessing would have been wrong in one direction or the other.
+- **Keep one backup, not N copies of the same commit.** `mikes-way/site-elevation` and `backup/pre-astro-integration` both pointed at `3424617`. The duplicate branch and its worktree were deleted; the branch whose *name states its purpose* stayed.
+- **A path-filtered deploy workflow is why a push needs a local gate.** `pioneer-api` has no CI on `main` — `.github/workflows/pages.yml` only runs on `docs/review/**` and its own file — so `bun test` (18/18) was the only thing standing between the two commits and `main`. Check the trigger paths before assuming a push will be verified for you.
+
+The push itself was the easy part once the state was measured: `2acd426..57f05fa`, no deploy triggered (correctly), remote left holding only `main`.
+
+## Worked example: the stale `wspace check` row that was about to prune real work
+
+Two "loose ends" arrived framed as one-line pushes: `pioneer-api` two commits ahead, and `wollacksystems.github.io` "3 behind with site-elevation work that exists only on local branches". Both halves of that framing were wrong in opposite directions, and only re-measuring showed it.
+
+**The "3 behind" repo was already current.** `wspace check` had run earlier in the session and reported `DIVERGED wollacksystems.github.io ahead 0 behind 3`. A `git fetch origin` plus `git log HEAD..origin/main` returned nothing: the checkout already sat on `origin/main`'s tip (`3e9e575`). The table described the moment it ran, not the state in hand. Acting on the stale row would have meant hunting for a fast-forward that did not exist.
+
+**The "unpushed work on local branches" was already shipped, under a different name.** Three local branches looked like unfinished work:
+
+- `mikes-way/site-health-audit` (`721d722`) — a true ancestor of `origin/main`; prunable outright.
+- `mikes-way/site-elevation` and `backup/pre-astro-integration` — both pointing at the *same* commit, `3424617 feat: elevate Wollack Systems site experience`.
+- `3424617` was not an ancestor of `main`, so the tempting read was "unique work, escalate". It was the opposite: a pre-Astro snapshot. Its three files (`index.html`, `journeyman.html`, `style.css`) no longer exist in `main` at all, because PR #8 migrated the site to Astro (`src/pages/index.astro`, `src/styles/global.css`) and PRs #14–#16 rebuilt the story on top of it. The branch was superseded, not pending — the name `backup/pre-astro-integration` was the branch documenting its own obsolescence.
+
+The two remote branches on `pioneer-api` needed a different test, because neither was an ancestor of `main` either. `comm -23 <(git ls-tree -r --name-only origin/<branch> | sort) <(git ls-tree -r --name-only origin/main | sort)` printed **nothing** — every path the branches touch already exists in `main` — and `git diff --stat origin/main origin/<branch>` was net-negative by ~1,500 lines. Both were pre-squash tips from 2026-09-19 whose content `main` had moved past six days ago. Superseded, not unique.
+
+The habits worth keeping:
+
+- **Re-measure a status line before you act on it.** The single most consequential correction in this session was re-running the tool that produced the claim. A `wspace check` table, a PR check rollup, or a quoted report is a timestamped snapshot; between the snapshot and the action, another process can move the ground.
+- **"Not merged" and "unique work" are not the same test.** `git merge-base --is-ancestor` answers only whether a branch is contained. The question that decides a prune is whether `main` already holds every path the branch touches *and* has moved past its content. That is why the rule carries both halves: ancestor-of-`main` **or** every-path-present-plus-net-negative-diff.
+- **A branch name can be the most honest documentation in the repo.** `backup/pre-astro-integration` and `factory/feature-investigate-af-projection` both announced what they were; one was telling the truth and got kept, the other was lying and got read as a diff before anything merged.
+- **Two branches, one commit, one decision.** `mikes-way/site-elevation` and `backup/pre-astro-integration` at the same SHA collapse to a single judgement — keep the explicitly named backup, drop the duplicate and its worktree — rather than two independent "is this merged?" investigations.
+- **A push with a path filter may legitimately deploy nothing.** `pioneer-api`'s `pages.yml` triggers only on `docs/review/**` and itself, so a push touching `src/` and `AGENTS.md` ran no workflow. That is the workflow working, not a missing deploy — check the trigger before reporting a gap.
