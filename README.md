@@ -536,9 +536,24 @@ of the live serverless agent, and it opened by instructing the model to read the
 durable memory and the caller's preferences — both reads against a host-side store that
 `vercel blob list-stores` showed as `● Suspended`. So the record was written for the engine
 that no longer owned the identity, and either the persona carried instructions to use tools
-it did not have, or the record was not the record. Nothing checked the two against each
-other. The same trap had already cost a sibling agent a real drift bug, and its fix was a
-reconcile step in the deploy — which is the shape this needs too.
+it did not have, or the record was not the record.
+
+Asking the running persona settled it, and the answer was the second one. One turn through
+`/zo/ask` with the persona id returned an identity the file does not contain: a reader that
+grounds claims in the repository "rather than writing code, opening pull requests, or
+deploying." The file describes the opposite — an orchestrator whose whole product is a draft
+pull request. The two texts have diverged, and the README's "the file is the record" line
+does not hold today. The sibling agent had already solved this the right way: its prompt of
+record lives in the repository and the persona is generated from it during deploy, so the
+two cannot disagree. A live turn is the cheap instrument here — cheaper than reading either
+prompt, and the only way to see what the runtime actually carries.
+
+**A file inventory undercounts a live surface.** The same inventory that split the halves
+called the serverless side's fate "a scope call." Its production logs said otherwise: the
+deployment took ~100 requests to its GitHub endpoint in the 14.5 minutes in the log window,
+all 200, because the app subscribes to `check_suite` and processes CI failures, not just
+mentions. Lines of code and live traffic rank the two engines differently, so decide what a
+surface *does* before deciding what it costs to keep.
 
 **Two failure policies for one incident class.** An earlier fix had routed both chat
 channels through one shared policy module. When one of those channels was deleted, the
