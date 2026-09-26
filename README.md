@@ -475,3 +475,37 @@ What made this a cut and not a rewrite is that the replacement already existed a
   shown a 68-minute gap between one package's release and its publish — one
   disconfirming datapoint was sitting in the data and got smoothed over. When
   a mechanism is cheap to test, test it before acting on the inference.
+
+## Worked example: four obsolete pull requests, and the one branch that was not
+
+Asked to clean up obsolete pull requests, the useful work was not in closing one
+that looked stale but in applying a test to each candidate before touching it.
+Four remote branches sat on the two agent repositories. Three were prunable by
+the rule as written: the file lists were identical to `main` and the diff was
+net-negative, because a sibling pull request had carried the same content in a
+cleaner form. The fourth, `fix/provider-rate-limit-retry`, touched two paths that
+`main` does not contain — a retry module and its test — so it is unique work and
+was escalated rather than deleted, even though its pull request was closed and
+its purpose (retrying a rate-limited turn in a runtime that has since been
+retired) is very likely moot. "Its pull request was closed" and "the branch is
+obsolete" are different claims, and only the second one is safe to act on.
+
+The oldest candidate was also the trap. A months-old draft pull request with
+merge conflicts reads like garbage, and one candidate on that repository had in
+fact been corrupted (its own branch had prefixed every documentation line with a
+line number and reverted a week of merged work). This one was coherent: a real
+skill, real reference material, no corruption. What made it obsolete was
+evidence, not appearance — it added a file whose owning subsystem had been
+deleted by a merged pull request, and its whole premise (a compiled agent with a
+blob-backed shared memory) was the thing the current direction is removing.
+Closing it also closed the only copy of a skill worth keeping, so that was filed
+as a salvage issue rather than silently dropped.
+
+- **"Stale and conflicting" is a smell, not a finding.** Read the diff and name
+  the evidence before closing: a path that no longer exists, a subsystem already
+  removed, a direction the project has left. A draft flag and a red merge state
+  describe age and conflict, not obsolescence.
+- **Check what a close takes with it.** Closing a pull request deletes nothing
+  from the repository, but a branch deletion is the only copy of any file `main`
+  lacks. Preserve the salvageable part somewhere named — an issue, an archive
+  directory — in the same session.
