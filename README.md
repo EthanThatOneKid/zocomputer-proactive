@@ -511,3 +511,41 @@ as a salvage issue rather than silently dropped.
   directory — in the same session.
 
 - **A deploy that deletes the file a service runs needs the service definition reconciled in the same window.** Moving a bridge's entrypoint from `bridge/discord-gateway/index.ts` to `channels/discord/index.ts` and merging it would have left the live service pointing at a deleted file: the repo's deploy workflow fast-forwards the checkout and restarts the service, but it never rewrites the entrypoint, so the restart crash-loops. The safe order is to reconcile the service first and merge second, but the new file must already exist in the live checkout for that, which means fast-forwarding the checkout by hand before the merge. That in turn makes CI's `git pull --ff-only` non-fast-forwardable when the merge squashes (the branch tip and the squash commit share a tree but not a parent) — the checkout has to be reset to the squash commit, which is safe precisely because `git diff --stat <branch-tip> origin/main` is empty. Recorded because "merge it and let CI deploy" reads as safe and is not, whenever the merge changes what file the service runs.
+
+## Worked example: one repository, two engines, and a prompt that claimed to be the record
+
+An agent's repository had been simplified once already — its Discord runtime moved off a
+serverless brain and onto a platform persona — and the change was described as done. The
+same repository still held the old engine in full: a compiled agent app, its stations, its
+own system prompt, its own model path, and its own memory store. Both halves answered as the
+same agent on different surfaces, so "Computer" behaved differently depending on how you
+reached it, and nothing in the repository said so.
+
+**The inventory was the deliverable.** Two numbers made the shape obvious: 12,172 lines and
+162 files on the serverless side against 1,714 lines and ~20 files on the hosted side, for
+the same identity. The cheap instrument was an import scan — for each file in the one shared
+directory, list its non-test importers and sort them by side. It produced three sets (hosted
+only, serverless only, genuinely shared), and it also surfaced two files with no importer
+outside their own tests, which CI had been keeping green for an unknown length of time. An
+import scan answers "which half owns this" without reading either half.
+
+**A "prompt of record" is a claim to test, not a fact to repeat.** The repository's own
+README said the persona's prompt of record was a file in the tree, and that the file was
+the record while the persona was the runtime. That file was also the compiled system prompt
+of the live serverless agent, and it opened by instructing the model to read the agent's
+durable memory and the caller's preferences — both reads against a host-side store that
+`vercel blob list-stores` showed as `● Suspended`. So the record was written for the engine
+that no longer owned the identity, and either the persona carried instructions to use tools
+it did not have, or the record was not the record. Nothing checked the two against each
+other. The same trap had already cost a sibling agent a real drift bug, and its fix was a
+reconcile step in the deploy — which is the shape this needs too.
+
+**Two failure policies for one incident class.** An earlier fix had routed both chat
+channels through one shared policy module. When one of those channels was deleted, the
+module was left serving a single caller while the surviving hosted channel handled the same
+failure class inline. Counting importers is how that kind of half-finished consolidation
+becomes visible; the commit message still described two callers.
+
+Two habits carry: when a migration is recorded as complete, count what each side still owns
+instead of reading the summary, and treat every "source of truth" line in a README as a
+claim to verify against the running system.
