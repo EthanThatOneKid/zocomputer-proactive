@@ -599,3 +599,40 @@ of that held: the dual-session churn is gone. The rest did not — the surviving
 completes a resume, `session resumed` never appears in its log, and a mention arriving in the gap
 is dropped. The closure was a claim about the class, and the class survived; re-testing it is what
 found the survivor (`wazootech/computer` #98).
+
+## Preserve unique work before deciding about it
+
+The safe set says to prune merged branches and stale worktrees. On 2026-09-26 a full sweep of 118
+checkouts found no dirty tree anywhere, but six local branches holding commits that exist nowhere
+else — no upstream, and no merged PR:
+
+| repo | branch | tip | what it is |
+| --- | --- | --- | --- |
+| `memory` | `issue-13-source-fidelity` | `17003cc` | WIP capture-fidelity work for #13 |
+| `porygon` | `stadium-render` | `988b33d` | Stadium 2 Porygon model viewer |
+| `super-fly` | `fix/restore-optic-activity` | `7ff8626` | five commits restoring optic activity |
+| `data` | `fix/provider-rate-limit-retry` | `4db2c21` | PR #18, closed unmerged; `lib/provider-retry.ts` is not in `main` |
+| `wiki` | `archive/wiki-desktop-pre-reconcile-2026-09-15` | `fcb4f6c` | deliberate archive |
+| `wollacksystems/.github` | `backup/pre-astro-integration` | `3424617` | deliberate pre-Astro backup |
+
+A clean working tree is not the same as preserved work. `git status` says nothing about a branch
+whose commits were never pushed, and a later cleanup pass that trusts "clean" can delete the only
+copy. The cheap, local, reversible insurance is a bundle per branch, written before any prune
+decision rather than after:
+
+```sh
+git bundle create <out>.bundle <branch>   # run from inside the source repo
+git bundle verify <out>.bundle            # also from inside a repo, see below
+```
+
+Bundles for these six sit at `/home/workspace/backups/branches-2026-09-26/`.
+
+**`git bundle verify` must run from inside a repository.** Run from a plain directory it reports
+every bundle as unverified, including a bundle that is byte-for-byte intact — which reads as "the
+backup failed" and invites deleting a good one. The failure was reproduced on all six; re-run from
+the source repo, all six report `The bundle records a complete history.`
+
+**A single-branch bundle carries no HEAD.** `git clone <bundle> <dir>` warns `remote HEAD refers to
+nonexistent ref` and checks out nothing, which again reads as a broken backup. Restore with
+`git clone -b <branch> <bundle> <dir>` — confirmed on `memory-issue-13-source-fidelity.bundle`,
+which came back as commit `17003cc` with 34 files.
