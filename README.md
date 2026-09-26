@@ -564,3 +564,38 @@ becomes visible; the commit message still described two callers.
 Two habits carry: when a migration is recorded as complete, count what each side still owns
 instead of reading the summary, and treat every "source of truth" line in a README as a
 claim to verify against the running system.
+
+## A merge style decides what "merged" can be tested by
+
+The pruning test offers ancestry first: "a branch is prunable when it is an ancestor of `main`, or
+when every path it touches already exists in `main` and `main` has moved past its content." Every
+pull request in this workspace lands as a squash, and a squashed branch tip is never an ancestor of
+the commit the merge produced, so both clauses misread a merge that just happened.
+
+Measured this session: `wazootech/data` #23 and `wazootech/computer` #97 both merged to `main`
+(`b757c0c`, `1bd5524`), and both remote branches were gone from `git ls-remote --heads origin`
+within minutes. Neither branch tip is an ancestor of its own merge commit, and neither branch's
+commit objects are reachable from `main` at all, because a squash writes one new commit and keeps
+none of the branch's. The first clause therefore calls a merged branch unmerged; the second then
+calls it "unique work" once the file comparison comes back empty for a reason that has nothing to
+do with lost work. What settles it is the pull request's own state plus the content:
+`gh pr view <n> --json state,mergeCommit`, then confirm the change is in the tree with
+`git show main:<path> | grep <the line that was added>`. The file-list comparison remains the right
+test for a branch whose PR is not merged.
+
+**`--delete-branch` is not a promise about the remote.** Both merges ended on
+`failed to delete local branch '...' checked out at .../worktrees/...`, and
+`git ls-remote --heads origin` still listed both branches afterwards. Only `ls-remote` settles
+whether a remote branch is gone; the merge output describes intent, not state.
+
+**A fast-forward against a stale ref is a silent no-op.** After the second merge,
+`git merge --ff-only origin/main` printed `Already up to date.` and left the checkout on the
+pre-merge commit, because the local `origin/main` ref had not been fetched since. The command is
+only as current as the ref.
+
+**A closed issue's reason is a claim too.** `wazootech/computer` #92 was closed on the argument
+that the reconnect churn it described no longer applied once the bridge was rewritten (#94). Half
+of that held: the dual-session churn is gone. The rest did not — the surviving bridge still never
+completes a resume, `session resumed` never appears in its log, and a mention arriving in the gap
+is dropped. The closure was a claim about the class, and the class survived; re-testing it is what
+found the survivor (`wazootech/computer` #98).
