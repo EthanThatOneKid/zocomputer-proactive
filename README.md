@@ -425,3 +425,28 @@ So the intervention was structural rather than a refactor. The bridge now posts 
 - **Archive, don't delete, when the reversal is cheap either way.** `git mv` into `archives/` kept the retired tests, the service record, and the reasoning in the tree, so undoing the call is one move, and the repository's own convention (`archives/`: superseded artifacts with the reason they were retired) does the explaining.
 - **Report the cut as a cut, with the count.** "Nine paths archived, one service to delete, four pull requests made obsolete, 16 tests out of the gate" is checkable. "Simplified the architecture" is not.
 - **Docs that describe the retired path are part of the change.** The host's own guide still said Data ran on Letta and named the model, the provider setup, and the timeout to tune. Left alone, the next session would have maintained a runtime that no longer existed.
+
+## Worked example: the runtime that only re-created a primitive already in place
+
+Data, Wazoo's support agent, had grown a self-hosted Letta agent behind its own
+`data-http` service — bought so the agent could write its own memory — layered on top of a
+Zo persona that already existed and a Discord bridge that already forwarded to it. Asked
+for an intervention on overengineering, the honest answer was that the runtime duplicated a
+primitive the account already pays for.
+
+The cut was structural, not a refactor. The bridge now posts an admitted mention straight to
+`/zo/ask` with the persona id, and the service, the memory-seeding script, the provider-key
+loader, the conversation-recovery logic, and the four open pull requests built on all of it
+moved to `archives/letta-brain/` with the reason written down.
+
+- **A bespoke runtime that duplicates a platform primitive is a deletion candidate, not a
+  maintenance item.** The test is naming the primitive that replaces it. When the answer is
+  "the thing we already had", the runtime is cost without capability.
+- **Prove the replacement before removing the thing it replaces.** A stub Zo and a stub
+  Discord proved the new path end to end, and one real `/zo/ask` against the live persona
+  proved the model call, before any live service was touched.
+- **Archive rather than delete.** The retired path keeps its own tests and its README under
+  `archives/`, so the reversal is one `git mv` and the reason stays legible.
+- **A cut is not finished at the merge.** The live service still routes through the old path
+  until the branch lands, so the service removal and the now-obsolete pull requests stay
+  named as open items instead of being reported as done.
