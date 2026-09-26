@@ -402,3 +402,15 @@ The same `pioneer-api` prompt work above ran in a second session against the sam
 - **A count in prose is always one worktree behind.** The guide asserted the workspace held "two retired copies" of `archives/agent-file/data.af`. That path is tracked in `wazootech/data`, so it materialises once per checkout of that repo — three the moment a third worktree (`fix/stale-conversation-recovery`) existed, minutes after the sentence was written. The durable fix was to stop asserting a number: "one per checkout of `data`, so the count tracks that repo's worktrees" stays true however many appear. Prefer the rule that generates the count over the count.
 
 The verification held across the move — the fixture, the HTTP service, and the evaluator were re-run against the markdown-sourced prompt and returned the same six observations, the same `A17`–`A22` mapping, and the preserved UTF-16LE envelope — which is the point: a packaging change that alters behavior is not a packaging change.
+
+## Worked example: a cutover another session was already running
+
+A platform-wide rename (drop `worldUid`, keep `worldId`/`world_id`) was in flight, and a fresh worktree was created for the console half of it. Minutes later that worktree held edits nobody had made from this session: the e2e mocks, the world-page call site, the reindex button. The edits were correct — better than the mechanical `sed` that had been planned, since they avoided a duplicate object key the rename would have introduced.
+
+The evidence was not a hunch. `ls -lt /home/.z/workspaces/` showed a conversation directory created during the turn, and `stat` on the edited files showed mtimes inside the turn's own window. Both pointed at a live parallel session working the same change in the same checkout.
+
+- **Before implementing a cutover, look for a session already running it.** `ls -lt /home/.z/workspaces/` and `stat` on the files you are about to edit answer this in seconds. A worktree with uncommitted changes you did not make is the signal, not a mystery.
+- **Yielding is the correct move, and it is cheap.** Racing produces two branch names for one change, two PRs, and a merge conflict in a file neither author intended to fight over. Stopping costs nothing; the parallel session finishes and the work still lands.
+- **The rename is mechanical; the coordination is not.** `sed` over `\bworldUid\b` found every site in seconds, but a blind pass on a mock object that already had a `worldId` key would have silently produced `worldId` twice. Check the object, not just the token.
+- **An archived repo's rename is not a dependency.** `wazootech/wazoo-e2e` still carried eleven `worldUid` references, but it was archived 2026-09-01 and nothing in `wazoo-console` imports it. Refs in dead code are not a blocker; say so instead of treating them as live.
+- **Fan a cutover out by consumer, and let the contract lead.** The management contract (`wazoo-api`) is the source of truth; the generated client follows it; the console and e2e suites follow the client. A consumer that reaches ahead of the contract compiles against types that do not exist yet.
