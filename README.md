@@ -674,3 +674,18 @@ while the cutover is validated," and open PR #317's `parity/oracle.ts` carries
 `ORACLE_PIN = "1bfb422"`. A detached worktree that matches `main` exactly is the signature of a
 deliberate pin, not a leftover — check what references the directory before removing it.
 
+
+### Worked example: the library PR that could not ship
+
+`wazootech/worlds-cloudflare` #42 read as ready by every easy test: non-draft, CLEAN and
+MERGEABLE, `ci` green, a small three-file diff. Merging it would have been a no-op with a red
+workflow. Its `deno.json` still carried `0.7.0`, which was already the published JSR version, and
+`publish.yml` does not skip in that case — it runs a guard that greps the registry for the local
+version and `exit 1`s with "already published - bump the version in deno.json or this job ships
+nothing", then a `deno publish` step. The merge would therefore have shipped nothing, which is
+also the whole point of the PR: a `refactor!` that makes the platform world-ID hard cutover safe
+to run. Readiness for a package repo is not just "green checks and MERGEABLE" — read the publish
+path first and ask whether the branch bumps the version, because a merge that publishes is an
+external action and a merge that cannot publish is a blocker to report rather than a merge to
+make. It was held and named: the version bump belongs with the cutover decision, and the
+API-side counterpart (`worlds-api` #91) was still conflicting.
