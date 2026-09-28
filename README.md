@@ -2,7 +2,7 @@
 
 A Zo Computer rule that keeps the agent closing loops instead of reporting them back.
 
-`rule.md` is the versioned source for the rule: an always-applied instruction telling Zo to fix safe, reversible problems in the same session, escalate only genuine decisions in one line, set up an automation for anything that will recur, keep each Zo API caller on a distinct service-prefixed access token, rotate Vercel secrets without disclosure, and keep this file in step with the live rule.
+`rule.md` is the versioned source for the rule: an always-applied instruction telling Zo to fix safe, reversible problems in the same session, escalate only genuine decisions in one line, set up an automation for anything that will recur, and keep this file in step with the live rule.
 
 ## Why it exists
 
@@ -24,15 +24,13 @@ The point, in the words that prompted it:
 
 ## Usage
 
-The rule has seven moving parts, in the order they typically fire:
+The rule has five moving parts, in the order they typically fire:
 
 1. **Fix the safe set in-session.** Flagged anomalies, stale paths or docs that contradict the code, unfinished follow-ups, duplicate automations, and merged-but-unpruned branches and worktrees get repaired during the session they are found. "Safe" is defined narrowly: local, reversible, no external side effects.
 2. **Escalate the rest in one line.** Merging to `main`, pushing, publishing, deploying, spending money, and creating or deleting repositories or manifest entries stay human decisions. When one surfaces, it is named with the repo, the action, and the reason — not a paragraph of options.
 3. **Schedule what will recur.** Anything that comes back on a cadence becomes a small automation instead of a promise to remember.
 4. **Verify before claiming.** Only what was actually checked gets stated as fact, and what could not be verified gets said plainly.
 5. **Keep the rule versioned.** Changes to the rule itself — refinements after a session, or a hand edit — are written back to this repository and installed into Zo in the same session, so the live rule and `rule.md` never disagree.
-6. **Give each Zo API caller its own access token.** Agents, bots, services, and deploy workflows use separate Zo Access Tokens with service-prefixed secret names. For Computer, `COMPUTER_CHAT_ZO_API_KEY`, `COMPUTER_DISCORD_ZO_API_KEY`, and `COMPUTER_DEPLOY_ZO_API_KEY` belong to different callers. The Space route key stays in Zo Secrets; it never goes to Vercel or browser code. A proxy bearer such as `COMPUTER_WEB_SECRET` is a separate credential.
-7. **Rotate Vercel secrets without disclosure.** Only act when authorized; pass a value from its approved secret source through stdin to the Vercel CLI (`vercel env add --force --type secret`), never as an argument, log, chat message, or workspace file. Verify only variable names and environment scopes. If a no-credit probe rejects a candidate, stop and resolve the source/runtime mismatch before redeploying. Redeploys need explicit approval; `/zo/ask` smoke tests need separate approval if they spend credits.
 
 ### Worked example
 
